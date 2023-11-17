@@ -8,7 +8,7 @@ authors = [
     {name="Hernan E. Grecco", email="hernan.grecco@gmail.com"},
 ]
 description = "Useful functions, classes and tools for handling and interacting with dataframes."
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = [
 ]
 license = {text = "BSD-3-Clause"}
@@ -26,7 +26,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
     "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
