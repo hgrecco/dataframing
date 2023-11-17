@@ -1,0 +1,11 @@
+DataFraming Changelog
+=====================
+
+0.1 (unreleased)
+----------------
+
+- Implemented `load` and `save` adding interaction with
+  metadata (in attrs) and hashing capabilities.
+- Implemented `load_many` and `save_many` to deal with
+  grouped dataframes.
+- Implemented Transformers.
