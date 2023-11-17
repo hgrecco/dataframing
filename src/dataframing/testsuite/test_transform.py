@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from .. import Transformer, use
+from ..transform import Transformer, use
 
 
 class Def1(Protocol):
