@@ -12,15 +12,35 @@ class Def2(Protocol):
     full_name: str
 
 
+class Def3(Protocol):
+    value_len: str
+
+
+class AttrExample:
+    def __init__(self, value) -> None:
+        self.value = value
+
+    @property
+    def value_len(self):
+        return len(self.value)
+
+
 def test_join():
     record: Def1 = dict(last_name="Grecco", first_name="Hernán")
 
     with Transformer.build(Def1, Def2) as (transformer, source, target):
         target.full_name = use("{}, {}".format, source.last_name, source.first_name)
 
-    assert transformer.transform_record(record) == dict(
-        full_name="Grecco, Hernán", last_name="Grecco", first_name="Hernán"
-    )
+    assert transformer.transform_record(record) == dict(full_name="Grecco, Hernán")
+
+
+def test_join_getattr():
+    record: Def1 = dict(last_name="Grecco", first_name="Hernán")
+
+    with Transformer.build(Def1, Def3) as (transformer, source, target):
+        target.value_len = use(AttrExample, source.last_name).value_len
+
+    assert transformer.transform_record(record) == dict(value_len=6)
 
 
 def test_join_with_out():
@@ -30,8 +50,9 @@ def test_join_with_out():
         target.full_name = use("{}, {}".format, source.last_name, source.first_name)
 
     out = {}
-    assert transformer.transform_record(record, out) == dict(full_name="Grecco, Hernán")
-    assert out == dict(full_name="Grecco, Hernán")
+    expected_out = dict(full_name="Grecco, Hernán")
+    assert transformer.transform_record(record, out) == expected_out
+    assert out == expected_out
 
 
 def test_split():
@@ -43,7 +64,7 @@ def test_split():
         )
 
     assert transformer.transform_record(record) == dict(
-        full_name="Grecco, Hernán", last_name="Grecco", first_name=" Hernán"
+        last_name="Grecco", first_name=" Hernán"
     )
 
 
@@ -56,10 +77,9 @@ def test_split_with_out():
         )
 
     out = {}
-    assert transformer.transform_record(record, out) == dict(
-        last_name="Grecco", first_name=" Hernán"
-    )
-    assert out == dict(last_name="Grecco", first_name=" Hernán")
+    expected_out = dict(last_name="Grecco", first_name=" Hernán")
+    assert transformer.transform_record(record, out) == expected_out
+    assert out == expected_out
 
 
 def test_transform_collection():

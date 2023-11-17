@@ -189,7 +189,7 @@ class Transformer(Generic[S, T]):
         """
         cache = {}
         if out is None:
-            out = record
+            out = {}
 
         for target_key, source in self.target:
             if isinstance(source, FutureGetItem):
@@ -214,12 +214,7 @@ class Transformer(Generic[S, T]):
         if isinstance(source, DataFrame):
             return DataFrame(self.transform_collection(source.to_dict("records")))
 
-        out = []
-        for el in source:
-            out_el = el.__class__()
-            out.append(self.transform_record(el, out_el))
-
-        return source.__class__(out)
+        return source.__class__(map(self.transform_record, source))
 
     @overload
     def __call__(self, source: S) -> T:
