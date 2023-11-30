@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from ..transform import Transformer, use
+import dataframing as dfr
 
 
 class Def1(Protocol):
@@ -25,11 +25,28 @@ class AttrExample:
         return len(self.value)
 
 
+def splitter(s: str) -> tuple[str, str]:
+    part1, part2 = s.split(",")
+    return part1.strip(), part2.strip()
+
+
 def test_join():
     record: Def1 = dict(last_name="Grecco", first_name="Hernán")
 
-    with Transformer.build(Def1, Def2) as (transformer, source, target):
-        target.full_name = use("{}, {}".format, source.last_name, source.first_name)
+    with dfr.morph(Def1, Def2) as (transformer, source, target):
+        target.full_name = dfr.wrap(
+            "{}, {}".format, source.last_name, source.first_name
+        )
+
+    assert transformer.transform_record(record) == dict(full_name="Grecco, Hernán")
+
+
+def test_join_wrap_appart():
+    record: Def1 = dict(last_name="Grecco", first_name="Hernán")
+
+    fullnamer = dfr.wrap("{}, {}".format)
+    with dfr.morph(Def1, Def2) as (transformer, source, target):
+        target.full_name = fullnamer(source.last_name, source.first_name)
 
     assert transformer.transform_record(record) == dict(full_name="Grecco, Hernán")
 
@@ -37,8 +54,8 @@ def test_join():
 def test_join_getattr():
     record: Def1 = dict(last_name="Grecco", first_name="Hernán")
 
-    with Transformer.build(Def1, Def3) as (transformer, source, target):
-        target.value_len = use(AttrExample, source.last_name).value_len
+    with dfr.morph(Def1, Def3) as (transformer, source, target):
+        target.value_len = dfr.wrap(AttrExample, source.last_name).value_len
 
     assert transformer.transform_record(record) == dict(value_len=6)
 
@@ -46,8 +63,10 @@ def test_join_getattr():
 def test_join_with_out():
     record: Def1 = dict(last_name="Grecco", first_name="Hernán")
 
-    with Transformer.build(Def1, Def2) as (transformer, source, target):
-        target.full_name = use("{}, {}".format, source.last_name, source.first_name)
+    with dfr.morph(Def1, Def2) as (transformer, source, target):
+        target.full_name = dfr.wrap(
+            "{}, {}".format, source.last_name, source.first_name
+        )
 
     out = {}
     expected_out = dict(full_name="Grecco, Hernán")
@@ -58,26 +77,22 @@ def test_join_with_out():
 def test_split():
     record: Def2 = dict(full_name="Grecco, Hernán")
 
-    with Transformer.build(Def2, Def1) as (transformer, source, target):
-        target.last_name, target.first_name = use(
-            lambda s: s.split(","), source.full_name
-        )
+    with dfr.morph(Def2, Def1) as (transformer, source, target):
+        target.last_name, target.first_name = dfr.wrap(splitter, source.full_name)
 
     assert transformer.transform_record(record) == dict(
-        last_name="Grecco", first_name=" Hernán"
+        last_name="Grecco", first_name="Hernán"
     )
 
 
 def test_split_with_out():
     record: Def2 = dict(full_name="Grecco, Hernán")
 
-    with Transformer.build(Def2, Def1) as (transformer, source, target):
-        target.last_name, target.first_name = use(
-            lambda s: s.split(","), source.full_name
-        )
+    with dfr.morph(Def2, Def1) as (transformer, source, target):
+        target.last_name, target.first_name = dfr.wrap(splitter, source.full_name)
 
     out = {}
-    expected_out = dict(last_name="Grecco", first_name=" Hernán")
+    expected_out = dict(last_name="Grecco", first_name="Hernán")
     assert transformer.transform_record(record, out) == expected_out
     assert out == expected_out
 
@@ -88,8 +103,10 @@ def test_transform_collection():
         dict(last_name="Perez", first_name="Juan"),
     ]
 
-    with Transformer.build(Def1, Def2) as (transformer, source, target):
-        target.full_name = use("{}, {}".format, source.last_name, source.first_name)
+    with dfr.morph(Def1, Def2) as (transformer, source, target):
+        target.full_name = dfr.wrap(
+            "{}, {}".format, source.last_name, source.first_name
+        )
 
     assert transformer.transform_collection(collection) == [
         dict(full_name="Grecco, Hernán"),
