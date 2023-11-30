@@ -4,7 +4,7 @@
 [![Python Versions](https://img.shields.io/pypi/pyversions/dataframing.svg)](https://pypi.python.org/pypi/dataframing)
 [![CI](https://github.com/hgrecco/dataframing/workflows/CI/badge.svg)](https://github.com/hgrecco/dataframing/actions?query=workflow%3ACI)
 [![LINTER](https://github.com/hgrecco/dataframing/workflows/Lint/badge.svg)](https://github.com/hgrecco/dataframing/actions?query=workflow%3ALint)
-[![Coverage](https://coveralls.io/repos/github/hgrecco/dataframing/badge.svg?branch=master)](https://coveralls.io/github/hgrecco/dataframing?branch=master)
+[![Coverage](https://coveralls.io/repos/github/hgrecco/dataframing/badge.svg?branch=main)](https://coveralls.io/github/hgrecco/dataframing?branch=main)
 
 # Motivation
 
