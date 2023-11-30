@@ -51,7 +51,7 @@ optional-dependencies.test = {file = "requirements.test.txt"}
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
-pythonpath = "."
+pythonpath = "src"
 
 [tool.ruff]
 select = ["E", "F", "I"]
