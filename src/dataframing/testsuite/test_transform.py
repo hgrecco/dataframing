@@ -31,28 +31,28 @@ def splitter(s: str) -> tuple[str, str]:
 
 
 def test_join():
-    record: Def1 = dict(last_name="Grecco", first_name="Hernán")
+    record: Def1 = dict(last_name="Cleese", first_name="John")
 
     with dfr.morph(Def1, Def2) as (transformer, source, target):
         target.full_name = dfr.wrap(
             "{}, {}".format, source.last_name, source.first_name
         )
 
-    assert transformer.transform_record(record) == dict(full_name="Grecco, Hernán")
+    assert transformer.transform_record(record) == dict(full_name="Cleese, John")
 
 
 def test_join_wrap_appart():
-    record: Def1 = dict(last_name="Grecco", first_name="Hernán")
+    record: Def1 = dict(last_name="Cleese", first_name="John")
 
     fullnamer = dfr.wrap("{}, {}".format)
     with dfr.morph(Def1, Def2) as (transformer, source, target):
         target.full_name = fullnamer(source.last_name, source.first_name)
 
-    assert transformer.transform_record(record) == dict(full_name="Grecco, Hernán")
+    assert transformer.transform_record(record) == dict(full_name="Cleese, John")
 
 
 def test_join_getattr():
-    record: Def1 = dict(last_name="Grecco", first_name="Hernán")
+    record: Def1 = dict(last_name="Cleese", first_name="John")
 
     with dfr.morph(Def1, Def3) as (transformer, source, target):
         target.value_len = dfr.wrap(AttrExample, source.last_name).value_len
@@ -61,7 +61,7 @@ def test_join_getattr():
 
 
 def test_join_with_out():
-    record: Def1 = dict(last_name="Grecco", first_name="Hernán")
+    record: Def1 = dict(last_name="Cleese", first_name="John")
 
     with dfr.morph(Def1, Def2) as (transformer, source, target):
         target.full_name = dfr.wrap(
@@ -69,38 +69,38 @@ def test_join_with_out():
         )
 
     out = {}
-    expected_out = dict(full_name="Grecco, Hernán")
+    expected_out = dict(full_name="Cleese, John")
     assert transformer.transform_record(record, out) == expected_out
     assert out == expected_out
 
 
 def test_split():
-    record: Def2 = dict(full_name="Grecco, Hernán")
+    record: Def2 = dict(full_name="Cleese, John")
 
     with dfr.morph(Def2, Def1) as (transformer, source, target):
         target.last_name, target.first_name = dfr.wrap(splitter, source.full_name)
 
     assert transformer.transform_record(record) == dict(
-        last_name="Grecco", first_name="Hernán"
+        last_name="Cleese", first_name="John"
     )
 
 
 def test_split_with_out():
-    record: Def2 = dict(full_name="Grecco, Hernán")
+    record: Def2 = dict(full_name="Cleese, John")
 
     with dfr.morph(Def2, Def1) as (transformer, source, target):
         target.last_name, target.first_name = dfr.wrap(splitter, source.full_name)
 
     out = {}
-    expected_out = dict(last_name="Grecco", first_name="Hernán")
+    expected_out = dict(last_name="Cleese", first_name="John")
     assert transformer.transform_record(record, out) == expected_out
     assert out == expected_out
 
 
 def test_transform_collection():
     collection: list[Def1] = [
-        dict(last_name="Grecco", first_name="Hernán"),
-        dict(last_name="Perez", first_name="Juan"),
+        dict(last_name="Cleese", first_name="John"),
+        dict(last_name="Gilliam", first_name="Terry"),
     ]
 
     with dfr.morph(Def1, Def2) as (transformer, source, target):
@@ -109,6 +109,6 @@ def test_transform_collection():
         )
 
     assert transformer.transform_collection(collection) == [
-        dict(full_name="Grecco, Hernán"),
-        dict(full_name="Perez, Juan"),
+        dict(full_name="Cleese, John"),
+        dict(full_name="Gilliam, Terry"),
     ]
