@@ -50,7 +50,7 @@ optional-dependencies.test = {file = "requirements.test.txt"}
 [tool.setuptools_scm]
 
 [tool.pytest.ini_options]
-addopts = "--import-mode=importlib"
+addopts = "--import-mode=importlib --doctest-modules"
 pythonpath = "src"
 
 [tool.ruff]

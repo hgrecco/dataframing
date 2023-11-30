@@ -184,16 +184,16 @@ class Transformer(Generic[S, T]):
 
     Example
     -------
-    >>> class Def1(Protocol):
+    >>> class Original(Protocol):
     ...     last_name: str
     ...     first_name: str
-    >>> class Def2(Protocol):
+    >>> class Modified(Protocol):
     ...    full_name: str
-    >>> with Transformer.build(Def1, Def2) as (transformer, source, target):
-    ...    target.full_name = use("{}, {}".format, source.last_name, source.first_name)
-    >>> record = dict(last_name="Grecco", first_name="Hernán")
+    >>> with morph(Original, Modified) as (transformer, source, target):
+    ...    target.full_name = wrap("{}, {}".format, source.last_name, source.first_name)
+    >>> record = dict(last_name="Cleese", first_name="John")
     >>> transformer.transform_record(record)
-
+    {'full_name': 'Cleese, John'}
     """
 
     def __init__(self, source: AttrGetter, target: AttrSetter):
