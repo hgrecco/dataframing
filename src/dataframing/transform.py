@@ -140,7 +140,24 @@ class FutureGetAttr:
         self.item = item
 
 
-def use(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+def _hungry_wrap(func: Callable[P, R]) -> Callable[P, R]:
+    def _internal(*args: P.args, **kwargs: P.kwargs) -> R:
+        return wrap(func, *args, **kwargs)
+
+    return _internal
+
+
+@overload
+def wrap(func: Callable[P, R]) -> Callable[P, R]:
+    ...
+
+
+@overload
+def wrap(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    ...
+
+
+def wrap(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
     """Creates a callable that can be used with records.
 
     Given a callable and protocol attributes given as args and kwargs,
@@ -149,6 +166,9 @@ def use(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
     This new callable will extract the protocol attributes from the record
     and used them as args and kwargs for the original callable.
     """
+
+    if not (args or kwargs):
+        return _hungry_wrap(func)
 
     def _from_dict(record: SupportsGetItem) -> R:
         return func(
@@ -229,26 +249,26 @@ class Transformer(Generic[S, T]):
             return self.transform_record(source)
         return self.transform_collection(source)
 
-    @contextlib.contextmanager
-    @staticmethod
-    def build(
-        source: type[S], target: type[T]
-    ) -> Generator[tuple["Transformer[S, T]", S, T], None, None]:
-        """Build a transformer class
 
-        Parameters
-        ----------
-        source
-            A protocol describing the source record.
-        target
-            A protocol describing the target record.
+@contextlib.contextmanager
+def morph(
+    source: type[S], target: type[T]
+) -> Generator[tuple[Transformer[S, T], S, T], None, None]:
+    """Build a transformer class
 
-        Yields
-        ------
-            The resulting transformer.
-            A proxy for a source record.
-            A proxy for a target record.
-        """
-        source = AttrGetter(source)  # type: ignore
-        target = AttrSetter(target)  # type: ignore
-        yield Transformer(source, target), source, target  # type: ignore
+    Parameters
+    ----------
+    source
+        A protocol describing the source record.
+    target
+        A protocol describing the target record.
+
+    Yields
+    ------
+        The resulting transformer.
+        A proxy for a source record.
+        A proxy for a target record.
+    """
+    source = AttrGetter(source)  # type: ignore
+    target = AttrSetter(target)  # type: ignore
+    yield Transformer(source, target), source, target  # type: ignore
