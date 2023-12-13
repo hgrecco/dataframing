@@ -84,6 +84,38 @@ transformer.
 {'last_name': 'Cleese', 'first_name': 'John'}
 ```
 
+If you want to enrich a record
+
+```python
+>>> from typing import Protocol
+>>> import dataframing as dfr
+>>>
+>>> class Original(Protocol):
+...     last_name: str
+...     first_name: str
+>>>
+>>> class Complete(Original, Protocol):
+...     full_name: str
+```
+
+you can copy each attribute
+
+```python
+>>> with dfr.morph(Original, Complete) as (ori2com, source, target):
+...    target.last_name = source.last_name
+...    target.first_name = source.first_name
+...    target.full_name = fullnamer(source.last_name, source.first_name)
+```
+
+or all in one go:
+
+```python
+>>> with dfr.morph(Original, Complete) as (ori2com, source, target):
+...    # This will copy all attributes present in both definitions
+...    dfr.copy(source, target)
+...    target.full_name = fullnamer(source.last_name, source.first_name)
+```
+
 # Input/Output
 
 You can also use it to save and load data.
