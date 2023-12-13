@@ -179,11 +179,33 @@ def test_copy2():
     assert transformer.transform_record(record) == expected
 
 
-# def test_temporary():
-#     record: Def1 = dict(last_name="Cleese", first_name="John")
+def test_split_with_temporary():
+    record: Def2 = dict(full_name="Cleese, John")
 
-#     with dfr.morph(Def1, Def5) as (transformer, source, target):
-#         target.full_name = dfr.wrap(
-#             "{}, {}".format, source.last_name, source.first_name
-#         )
-#     assert transformer.transform_record(record) == dict(value_len="cheese")
+    with dfr.morph(Def2, Def1) as (transformer, source, target):
+        tmp = dfr.wrap(splitter, source.full_name)
+        target.last_name = tmp[0]
+        target.first_name = tmp[1]
+
+    out = {}
+    expected_out = dict(last_name="Cleese", first_name="John")
+    assert transformer.transform_record(record, out) == expected_out
+    assert out == expected_out
+
+
+def test_transform_collection_temp():
+    records = [
+        dict(full_name="Cleese, John"),
+        dict(full_name="Gilliam, Terry"),
+    ]
+    expected: list[Def1] = [
+        dict(last_name="Cleese", first_name="John"),
+        dict(last_name="Gilliam", first_name="Terry"),
+    ]
+
+    with dfr.morph(Def2, Def1) as (transformer, source, target):
+        tmp = dfr.wrap(splitter, source.full_name)
+        target.first_name = tmp[1]
+        target.last_name = tmp[0]
+
+    assert transformer.transform_collection(records) == expected

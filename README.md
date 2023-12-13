@@ -75,7 +75,7 @@ transformer.
 >>> def splitter(s: str) -> tuple[str, str]:
 ...     part1, part2 = s.split(",")
 ...     return part1.strip(), part2.strip()
->>> namesplitter = dfr.wrap(splitter)
+>>> namesplitter = dfr.wrap(splitter) # you can also use it as a decorator!
 >>> with dfr.morph(Modified, Original) as (mod2ori, source, target):
 ...    target.last_name, target.first_name = namesplitter(source.full_name)
 >>>
@@ -114,6 +114,18 @@ or all in one go:
 ...    # This will copy all attributes present in both definitions
 ...    dfr.copy(source, target)
 ...    target.full_name = fullnamer(source.last_name, source.first_name)
+```
+
+If you need to store an intermediate result and then obtain a
+result either by attribute or item you can also use wrap:
+
+```python
+>>> with dfr.morph(Original, Modified) as (ori2mod, source, target): # doctest: +SKIP
+...     result = dfr.wrap(long_computation, source.value) # doctest: +SKIP
+...     target.p0 = result.p0 # doctest: +SKIP
+...     target.p1 = result.p1 # doctest: +SKIP
+...     target.p2 = result.p2 # doctest: +SKIP
+...     target.chi2 = result["chi2"] # doctest: +SKIP
 ```
 
 # Input/Output
