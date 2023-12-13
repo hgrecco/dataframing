@@ -18,9 +18,11 @@ from typing import (
     Callable,
     Generator,
     Generic,
+    NamedTuple,
     ParamSpec,
     Protocol,
     TypeVar,
+    get_type_hints,
     overload,
 )
 
@@ -62,10 +64,15 @@ class AttrGetter:
     def __init__(self, protocol: Protocol) -> None:
         self._protocol = protocol
 
-    def __getattr__(self, name: str) -> str:
-        if name not in self._protocol.__annotations__:
+    def __getattr__(self, name: str) -> "AttrTuple":
+        if name not in get_type_hints(self._protocol):
             raise ValueError(f"{self._protocol} does not have a {name} attribute.")
-        return name
+        return AttrTuple(self, name)
+
+
+class AttrTuple(NamedTuple):
+    attr_getter: AttrGetter
+    attr_name: str
 
 
 class AttrSetter:
@@ -85,8 +92,10 @@ class AttrSetter:
     def __setattr__(self, name: str, value: Any):
         if name == "_content" or name == "_protocol":
             return super().__setattr__(name, value)
-        if name not in self._protocol.__annotations__:
+        if name not in get_type_hints(self._protocol):
             raise ValueError(f"{self._protocol} does not have a {name} attribute.")
+        if isinstance(value, AttrTuple):
+            value = wrap(lambda el: el, getattr(value.attr_getter, value.attr_name))
         self._content[name] = value
 
     def __iter__(self):
@@ -172,10 +181,20 @@ def wrap(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
 
     def _from_dict(record: SupportsGetItem) -> R:
         return func(
-            *(record[k] for k in args), **{k: record[v] for k, v in kwargs.items()}
+            *(record[k.attr_name] for k in args),
+            **{k: record[v.attr_name] for k, v in kwargs.items()},
         )  # type: ignore
 
     return Mapper(_from_dict)
+
+
+def copy(source: AttrGetter, target: AttrSetter) -> None:
+    source_attrs = set(get_type_hints(source._protocol).keys())
+    target_attrs = set(get_type_hints(target._protocol).keys())
+    attrs = source_attrs.intersection(target_attrs)
+
+    for name in attrs:
+        target._content[name] = wrap(lambda value: value, getattr(source, name))
 
 
 class Transformer(Generic[S, T]):

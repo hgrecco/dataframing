@@ -16,6 +16,14 @@ class Def3(Protocol):
     value_len: str
 
 
+class Def4(Def2, Protocol):
+    inverted_full_name: str
+
+
+class Def5(Def1, Def2, Protocol):
+    pass
+
+
 class AttrExample:
     def __init__(self, value) -> None:
         self.value = value
@@ -112,3 +120,70 @@ def test_transform_collection():
         dict(full_name="Cleese, John"),
         dict(full_name="Gilliam, Terry"),
     ]
+
+
+def test_inheritance():
+    record: Def1 = dict(last_name="Cleese", first_name="John")
+
+    with dfr.morph(Def1, Def4) as (transformer, source, target):
+        target.full_name = dfr.wrap(
+            "{}, {}".format, source.last_name, source.first_name
+        )
+        target.inverted_full_name = dfr.wrap(
+            "{}, {}".format, source.first_name, source.last_name
+        )
+
+    assert transformer.transform_record(record) == dict(
+        full_name="Cleese, John", inverted_full_name="John, Cleese"
+    )
+
+
+def test_constant():
+    record: Def1 = dict(last_name="Cleese", first_name="John")
+
+    with dfr.morph(Def1, Def3) as (transformer, source, target):
+        target.value_len = "cheese"
+
+    assert transformer.transform_record(record) == dict(value_len="cheese")
+
+
+def test_copy1():
+    record: Def1 = dict(last_name="Cleese", first_name="John")
+    expected: Def5 = dict(
+        last_name="Cleese",
+        first_name="John",
+        full_name="Cleese, John",
+    )
+    with dfr.morph(Def1, Def5) as (transformer, source, target):
+        target.first_name = source.first_name
+        target.last_name = source.last_name
+        target.full_name = dfr.wrap(
+            "{}, {}".format, source.last_name, source.first_name
+        )
+    assert transformer.transform_record(record) == expected
+
+
+def test_copy2():
+    record: Def1 = dict(last_name="Cleese", first_name="John")
+    expected: Def5 = dict(
+        last_name="Cleese",
+        first_name="John",
+        full_name="Cleese, John",
+    )
+
+    with dfr.morph(Def1, Def5) as (transformer, source, target):
+        dfr.copy(source, target)
+        target.full_name = dfr.wrap(
+            "{}, {}".format, source.last_name, source.first_name
+        )
+    assert transformer.transform_record(record) == expected
+
+
+# def test_temporary():
+#     record: Def1 = dict(last_name="Cleese", first_name="John")
+
+#     with dfr.morph(Def1, Def5) as (transformer, source, target):
+#         target.full_name = dfr.wrap(
+#             "{}, {}".format, source.last_name, source.first_name
+#         )
+#     assert transformer.transform_record(record) == dict(value_len="cheese")
