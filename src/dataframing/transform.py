@@ -26,6 +26,17 @@ from typing import (
     overload,
 )
 
+try:
+    from mpire import WorkerPool  # type: ignore
+except ImportError:
+
+    def WorkerPool(*args, **kwargs):  # type: ignore
+        raise ValueError(
+            "Using more than one process to calculate require mpire.\n"
+            "pip install mpire"
+        )
+
+
 from pandas import DataFrame
 
 from .protocols import SupportsGetItem
@@ -248,12 +259,24 @@ class Transformer(Generic[S, T]):
 
         return out
 
-    def transform_collection(self, source: Collection[S]) -> Collection[T]:
+    def transform_collection(
+        self, source: Collection[S], *, max_workers: int | None = 1
+    ) -> Collection[T]:
         """Transform a collection of records."""
-        if isinstance(source, DataFrame):
-            return DataFrame(self.transform_collection(source.to_dict("records")))
 
-        return source.__class__(map(self.transform_record, source))
+        if isinstance(source, DataFrame):
+            records = source.to_dict("records")
+        else:
+            records = source
+
+        if max_workers == 1:
+            out_records = map(self.transform_record, records)
+        else:
+            records = list((record,) for record in records)
+            with WorkerPool(n_jobs=max_workers) as pool:
+                out_records = pool.map(self.transform_record, records)
+
+        return source.__class__(out_records)
 
     @overload
     def __call__(self, source: S) -> T:

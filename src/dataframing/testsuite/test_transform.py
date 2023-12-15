@@ -209,3 +209,5 @@ def test_transform_collection_temp():
         target.last_name = tmp[0]
 
     assert transformer.transform_collection(records) == expected
+
+    assert transformer.transform_collection(records, max_workers=2) == expected
