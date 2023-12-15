@@ -242,20 +242,25 @@ class Transformer(Generic[S, T]):
             out = {}
 
         for target_key, source in self.target:
-            if isinstance(source, FutureGetItem):
-                if source.mapper not in cache:
-                    cache[source.mapper] = source.mapper(record)
+            try:
+                if isinstance(source, FutureGetItem):
+                    if source.mapper not in cache:
+                        cache[source.mapper] = source.mapper(record)
 
-                out[target_key] = cache[source.mapper][source.item]
-            elif isinstance(source, FutureGetAttr):
-                if source.mapper not in cache:
-                    cache[source.mapper] = source.mapper(record)
+                    out[target_key] = cache[source.mapper][source.item]
+                elif isinstance(source, FutureGetAttr):
+                    if source.mapper not in cache:
+                        cache[source.mapper] = source.mapper(record)
 
-                out[target_key] = getattr(cache[source.mapper], source.item)
-            elif isinstance(source, Mapper):
-                out[target_key] = source(record)
-            else:
-                out[target_key] = source
+                    out[target_key] = getattr(cache[source.mapper], source.item)
+                elif isinstance(source, Mapper):
+                    out[target_key] = source(record)
+                else:
+                    out[target_key] = source
+
+            except Exception as ex:
+                ex.add_note(f"while setting {target_key}.")
+                raise ex
 
         return out
 
