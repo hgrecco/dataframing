@@ -16,33 +16,34 @@ The main goal is to allow you to transforme a dataframe structure into
 another in a way which is easy to use, understand how structures are
 connected and allows you to work with typing.
 
-It assumes that you have a `Protocol` defining your dataframes (which
+It assumes that you have a `TypedDict` defining your dataframes (which
 by the way is a convenient thing to do!). For example:
 
 ```python
->>> from typing import Protocol
+>>> from typing import TypedDict
 >>> import dataframing as dfr
 >>>
->>> class Original(Protocol):
+>>> class Original(TypedDict):
 ...     last_name: str
 ...     first_name: str
 >>>
->>> class Modified(Protocol):
+>>> class Modified(TypedDict):
 ...    full_name: str
 ```
 
 Now we build a transformer that connects `Original` and `Modified`
 
 ```python
->>> with dfr.morph(Original, Modified) as (ori2mod, source, target):
-...    target.full_name = dfr.wrap("{}, {}".format, source.last_name, source.first_name)
+>>> @dfr.wrap
+... def ori2mod(source: Original, target: Modified):
+...    target["full_name"] = "{}, {}".format(source["last_name"], source["first_name"])
 ```
 
 And now is ready to use!
 
 ```python
 >>> row = dict(last_name="Cleese", first_name="John")
->>> ori2mod.transform_record(row)
+>>> ori2mod(row)
 {'full_name': 'Cleese, John'}
 ```
 
@@ -50,22 +51,15 @@ Notice that we are demonstrating this with a dictionary but it will work this
 with a dataframe row, or a full dataframe (or iterable of dicts).
 
 ```python
->>> data = [
+>>> import pandas as pd
+>>> data = pd.DataFrame([
 ...   dict(last_name="Cleese", first_name="John"),
 ...   dict(last_name="Gilliam", first_name="Terry")
-...   ]
->>> ori2mod.transform_collection(data)
-[{'full_name': 'Cleese, John'}, {'full_name': 'Gilliam, Terry'}]
-```
-
-If you are going to use a particular function a lot,
-you can wrap it once and use it multiple times. This also helps to keep
-the converter visually clean.
-
-```python
->>> fullnamer = dfr.wrap("{}, {}".format)
->>> with dfr.morph(Original, Modified) as (ori2mod, source, target):
-...    target.full_name = fullnamer(source.last_name, source.first_name)
+...   ])
+>>> ori2mod.map(data)
+        full_name
+0    Cleese, John
+1  Gilliam, Terry
 ```
 
 To show case how to create two columns from one, we are going to build the reverse
@@ -75,12 +69,12 @@ transformer.
 >>> def splitter(s: str) -> tuple[str, str]:
 ...     part1, part2 = s.split(",")
 ...     return part1.strip(), part2.strip()
->>> namesplitter = dfr.wrap(splitter) # you can also use it as a decorator!
->>> with dfr.morph(Modified, Original) as (mod2ori, source, target):
-...    target.last_name, target.first_name = namesplitter(source.full_name)
+>>> @dfr.wrap
+... def mod2ori(source: Modified, target: Original):
+...    target["last_name"], target["first_name"] = splitter(source["full_name"])
 >>>
 >>> row = dict(full_name="Cleese, John")
->>> mod2ori.transform_record(row)
+>>> mod2ori(row)
 {'last_name': 'Cleese', 'first_name': 'John'}
 ```
 
@@ -90,42 +84,32 @@ If you want to enrich a record
 >>> from typing import Protocol
 >>> import dataframing as dfr
 >>>
->>> class Original(Protocol):
+>>> class Original(TypedDict):
 ...     last_name: str
 ...     first_name: str
 >>>
->>> class Complete(Original, Protocol):
+>>> class Complete(Original):
 ...     full_name: str
 ```
 
 you can copy each attribute
 
 ```python
->>> with dfr.morph(Original, Complete) as (ori2com, source, target):
-...    target.last_name = source.last_name
-...    target.first_name = source.first_name
-...    target.full_name = fullnamer(source.last_name, source.first_name)
+>>> @dfr.wrap
+... def with_copy(source: Original, target: Complete):
+...    target["last_name"] = source["last_name"]
+...    target["first_name"] = source["first_name"]
+...    target["full_name"] = fullnamer(source["last_name"], source["first_name"])
 ```
 
 or all in one go:
 
 ```python
->>> with dfr.morph(Original, Complete) as (ori2com, source, target):
+>>> @dfr.wrap
+... def with_copy(source: Original, target: Complete):
 ...    # This will copy all attributes present in both definitions
 ...    dfr.copy(source, target)
-...    target.full_name = fullnamer(source.last_name, source.first_name)
-```
-
-If you need to store an intermediate result and then obtain a
-result either by attribute or item you can also use wrap:
-
-```python
->>> with dfr.morph(Original, Modified) as (ori2mod, source, target): # doctest: +SKIP
-...     result = dfr.wrap(long_computation, source.value) # doctest: +SKIP
-...     target.p0 = result.p0 # doctest: +SKIP
-...     target.p1 = result.p1 # doctest: +SKIP
-...     target.p2 = result.p2 # doctest: +SKIP
-...     target.chi2 = result["chi2"] # doctest: +SKIP
+...    target.full_name = fullnamer(source["last_name"], source["first_name"])
 ```
 
 # Input/Output

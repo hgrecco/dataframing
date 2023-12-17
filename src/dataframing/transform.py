@@ -8,23 +8,17 @@
     :license: BSD, see LICENSE for more details.
 """
 
-
-import contextlib
-import dis
-import inspect
-from collections.abc import Collection
+import copy as _copy
+from contextvars import ContextVar
 from typing import (
-    Any,
     Callable,
-    Generator,
     Generic,
-    NamedTuple,
-    ParamSpec,
-    Protocol,
+    TypedDict,
     TypeVar,
     get_type_hints,
-    overload,
 )
+
+import pandas as pd
 
 try:
     from mpire import WorkerPool  # type: ignore
@@ -37,285 +31,51 @@ except ImportError:
         )
 
 
-from pandas import DataFrame
+S = TypeVar("S", bound=TypedDict)
+T = TypeVar("T", bound=TypedDict)
 
-from .protocols import SupportsGetItem
-
-S = TypeVar("S")
-T = TypeVar("T")
-
-P = ParamSpec("P")
-R = TypeVar("R")
+var_intersect_keys = ContextVar("var")
 
 
-def expecting(offset: int = 0) -> int:
-    """Return how many values the caller is expecting"""
-    f = inspect.currentframe().f_back.f_back
-    i = f.f_lasti + offset
-    bytecode = f.f_code.co_code
-    instruction = bytecode[i]
-    if instruction == dis.opmap["UNPACK_SEQUENCE"]:
-        return bytecode[i + 1]
-    elif instruction == dis.opmap["POP_TOP"]:
-        return 0
-    else:
-        return 1
-
-
-class AttrGetter:
-    """Given a protocol, will return the name of the attribute
-    if the attribute is present within the protocol.
-
-    Raises
-    ------
-    ValueError
-        If the attribute is not present within the protocol.
-    """
-
-    def __init__(self, protocol: Protocol) -> None:
-        self._protocol = protocol
-
-    def __getattr__(self, name: str) -> "AttrTuple":
-        if name not in get_type_hints(self._protocol):
-            raise ValueError(f"{self._protocol} does not have a {name} attribute.")
-        return AttrTuple(self, name)
-
-
-class AttrTuple(NamedTuple):
-    attr_getter: AttrGetter
-    attr_name: str
-
-
-class AttrSetter:
-    """Given a protocol, will enable to set an attribute
-    if the attribute is present within the protocol.
-
-    Raises
-    ------
-    ValueError
-        If the attribute is not present within the protocol.
-    """
-
-    def __init__(self, protocol: Protocol) -> None:
-        self._protocol = protocol
-        self._content: dict[str, Any] = {}
-
-    def __setattr__(self, name: str, value: Any):
-        if name == "_content" or name == "_protocol":
-            return super().__setattr__(name, value)
-        if name not in get_type_hints(self._protocol):
-            raise ValueError(f"{self._protocol} does not have a {name} attribute.")
-        if isinstance(value, AttrTuple):
-            value = wrap(lambda el: el, getattr(value.attr_getter, value.attr_name))
-        self._content[name] = value
-
-    def __iter__(self):
-        return iter(self._content.items())
-
-
-class Mapper:
-    """Helper class to map a record into another record."""
-
-    def __init__(
-        self,
-        func: Callable[
-            [
-                SupportsGetItem,
-            ],
-            Any,
-        ],
-    ) -> None:
-        self.func = func
-        self._ready = False
-
-    def __call__(self, record: SupportsGetItem) -> Any:
-        out = self.func(record)
-        self._ready = True
-        return out
-
-    def __getattr__(self, name: str) -> Any:
-        return FutureGetAttr(self, name)
-
-    def __getitem__(self, item: Any) -> Any:
-        return FutureGetItem(self, item)
-
-    def __iter__(self):
-        for n in range(expecting(offset=0)):
-            yield self[n]
-
-
-class FutureGetItem:
-    """Helper class to extract an item after the mapper has been executed."""
-
-    def __init__(self, mapper: Mapper, item: Any) -> None:
-        self.mapper = mapper
-        self.item = item
-
-
-class FutureGetAttr:
-    """Helper class to extract an attribute after the mapper has been executed."""
-
-    def __init__(self, mapper: Mapper, item: str) -> None:
-        self.mapper = mapper
-        self.item = item
-
-
-def _hungry_wrap(func: Callable[P, R]) -> Callable[P, R]:
-    def _internal(*args: P.args, **kwargs: P.kwargs) -> R:
-        return wrap(func, *args, **kwargs)
-
-    return _internal
-
-
-@overload
-def wrap(func: Callable[P, R]) -> Callable[P, R]:
-    ...
-
-
-@overload
-def wrap(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
-    ...
-
-
-def wrap(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
-    """Creates a callable that can be used with records.
-
-    Given a callable and protocol attributes given as args and kwargs,
-    creates a new callable that will accept a record.
-
-    This new callable will extract the protocol attributes from the record
-    and used them as args and kwargs for the original callable.
-    """
-
-    if not (args or kwargs):
-        return _hungry_wrap(func)
-
-    def _from_dict(record: SupportsGetItem) -> R:
-        return func(
-            *(record[k.attr_name] for k in args),
-            **{k: record[v.attr_name] for k, v in kwargs.items()},
-        )  # type: ignore
-
-    return Mapper(_from_dict)
-
-
-def copy(source: AttrGetter, target: AttrSetter) -> None:
-    source_attrs = set(get_type_hints(source._protocol).keys())
-    target_attrs = set(get_type_hints(target._protocol).keys())
-    attrs = source_attrs.intersection(target_attrs)
-
-    for name in attrs:
-        target._content[name] = wrap(lambda value: value, getattr(source, name))
+def copy(source: S, target: T) -> None:
+    intersect_keys = var_intersect_keys.get()
+    for name in intersect_keys:
+        target[name] = _copy.deepcopy(source[name])
 
 
 class Transformer(Generic[S, T]):
-    """A transformer object allows to generate a set of rules
-    to transform a record into another and then use them.
+    @staticmethod
+    def __call__(source: S) -> T:
+        ...
 
-    Example
-    -------
-    >>> class Original(Protocol):
-    ...     last_name: str
-    ...     first_name: str
-    >>> class Modified(Protocol):
-    ...    full_name: str
-    >>> with morph(Original, Modified) as (transformer, source, target):
-    ...    target.full_name = wrap("{}, {}".format, source.last_name, source.first_name)
-    >>> record = dict(last_name="Cleese", first_name="John")
-    >>> transformer.transform_record(record)
-    {'full_name': 'Cleese, John'}
-    """
+    @staticmethod
+    def map(records: pd.DataFrame, *, max_workers: int | None = 1) -> pd.DataFrame:
+        ...
 
-    def __init__(self, source: AttrGetter, target: AttrSetter):
-        self.source = source
-        self.target = target
 
-    def transform_record(
-        self, record: dict[str, Any], out: dict[str, Any] | None = None
-    ) -> dict[str, Any]:
-        """Transform a record.
+def wrap(func: Callable[[S, T], None]) -> Transformer[S, T]:
+    func_types = get_type_hints(func)
+    source_typed_dict = get_type_hints(func_types["source"])
+    target_typed_dict = get_type_hints(func_types["target"])
+    intersect_keys = set(source_typed_dict).intersection(set(target_typed_dict))
 
-        Use `out` to provide a location into which the result is stored.
-        """
-        cache = {}
-        if out is None:
-            out = {}
+    def _inner(source: S) -> T:
+        token = var_intersect_keys.set(intersect_keys)
+        target = {}  # type: ignore
+        func(source, target)
+        var_intersect_keys.reset(token)
+        return target
 
-        for target_key, source in self.target:
-            try:
-                if isinstance(source, FutureGetItem):
-                    if source.mapper not in cache:
-                        cache[source.mapper] = source.mapper(record)
-
-                    out[target_key] = cache[source.mapper][source.item]
-                elif isinstance(source, FutureGetAttr):
-                    if source.mapper not in cache:
-                        cache[source.mapper] = source.mapper(record)
-
-                    out[target_key] = getattr(cache[source.mapper], source.item)
-                elif isinstance(source, Mapper):
-                    out[target_key] = source(record)
-                else:
-                    out[target_key] = source
-
-            except Exception as ex:
-                ex.add_note(f"while setting {target_key}.")
-                raise ex
-
-        return out
-
-    def transform_collection(
-        self, source: Collection[S], *, max_workers: int | None = 1
-    ) -> Collection[T]:
-        """Transform a collection of records."""
-
-        if isinstance(source, DataFrame):
-            records = source.to_dict("records")
-        else:
-            records = source
-
+    def _map(records: pd.DataFrame, *, max_workers: int | None = 1) -> pd.DataFrame:
         if max_workers == 1:
-            out_records = map(self.transform_record, records)
+            out_records = records.apply(_inner, axis=1)
         else:
-            records = list((record,) for record in records)
+            records = list((record,) for record in records.to_dict("records"))
             with WorkerPool(n_jobs=max_workers) as pool:
-                out_records = pool.map(self.transform_record, records)
+                out_records = pool.map(_inner, records)
 
-        return source.__class__(out_records)
+        return pd.DataFrame(list(out_records))
 
-    @overload
-    def __call__(self, source: S) -> T:
-        ...
+    _inner.map = _map
 
-    @overload
-    def __call__(self, source: Collection[S]) -> Collection[T]:
-        ...
-
-    def __call__(self, source):
-        if isinstance(source, dict):
-            return self.transform_record(source)
-        return self.transform_collection(source)
-
-
-@contextlib.contextmanager
-def morph(
-    source: type[S], target: type[T]
-) -> Generator[tuple[Transformer[S, T], S, T], None, None]:
-    """Build a transformer class
-
-    Parameters
-    ----------
-    source
-        A protocol describing the source record.
-    target
-        A protocol describing the target record.
-
-    Yields
-    ------
-        The resulting transformer.
-        A proxy for a source record.
-        A proxy for a target record.
-    """
-    source = AttrGetter(source)  # type: ignore
-    target = AttrSetter(target)  # type: ignore
-    yield Transformer(source, target), source, target  # type: ignore
+    return _inner
