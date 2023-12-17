@@ -15,6 +15,7 @@ from typing import (
     Generic,
     TypedDict,
     TypeVar,
+    _TypedDictMeta,
     get_type_hints,
 )
 
@@ -55,8 +56,29 @@ class Transformer(Generic[S, T]):
 
 def wrap(func: Callable[[S, T], None]) -> Transformer[S, T]:
     func_types = get_type_hints(func)
-    source_typed_dict = get_type_hints(func_types["source"])
-    target_typed_dict = get_type_hints(func_types["target"])
+    args = list(func_types.keys())
+    source_type = func_types[args[0]]
+    target_type = func_types[args[1]]
+    if not isinstance(source_type, _TypedDictMeta):
+        raise TypeError(
+            f"The first parameter ({args[0]}) annotation must be "
+            f"a subclass TypeDict, not {source_type}"
+        )
+    if not isinstance(target_type, _TypedDictMeta):
+        raise TypeError(
+            f"The second parameter ({args[1]}) annotation must be "
+            f"a subclass TypeDict, not {source_type}"
+        )
+    if "return" in args and func_types["return"] is not type(None):
+        raise TypeError(f"The return type must be None, not {func_types["return"]}")
+    count_args = len(args) - +(1 if "return" in args else 0)
+    if count_args != 2:
+        raise ValueError(
+            f"The function must have exactly two arguments, " f"not {count_args}"
+        )
+
+    source_typed_dict = get_type_hints(source_type)
+    target_typed_dict = get_type_hints(target_type)
     intersect_keys = set(source_typed_dict).intersection(set(target_typed_dict))
 
     def _inner(source: S) -> T:
