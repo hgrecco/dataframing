@@ -70,7 +70,8 @@ def wrap(func: Callable[[S, T], None]) -> Transformer[S, T]:
             f"a subclass TypeDict, not {source_type}"
         )
     if "return" in args and func_types["return"] is not type(None):
-        raise TypeError(f"The return type must be None, not {func_types["return"]}")
+        rtype = func_types["return"]
+        raise TypeError(f"The return type must be None, not {rtype}")
     count_args = len(args) - +(1 if "return" in args else 0)
     if count_args != 2:
         raise ValueError(
