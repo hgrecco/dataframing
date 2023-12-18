@@ -10,6 +10,7 @@
 
 import hashlib
 import pathlib
+from typing import Literal
 
 import pandas as pd
 
@@ -166,7 +167,12 @@ def save(
 
 
 def save_many(
-    dfs: dict[str, pd.DataFrame], filename: str | pathlib.Path, *, use_hash: bool = True
+    dfs: dict[str, pd.DataFrame],
+    filename: str | pathlib.Path,
+    *,
+    use_hash: bool = True,
+    mode: Literal["w", "a"] = "a",
+    if_sheet_exists: Literal["error", "new", "replace", "overlay"] = "replace",
 ):
     """Save multiple dataframes to a file.
 
@@ -185,6 +191,6 @@ def save_many(
 
     _check_valid_extensions(filename)
 
-    with pd.ExcelWriter(filename) as writer:
+    with pd.ExcelWriter(filename, mode=mode, if_sheet_exists=if_sheet_exists) as writer:
         for sheet_name, df in dfs.items():
             save(df, writer, sheet_name, use_hash=use_hash)
