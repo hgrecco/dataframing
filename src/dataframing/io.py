@@ -10,14 +10,26 @@
 
 import hashlib
 import pathlib
-from typing import Literal
+from typing import Any, Callable, Literal
 
 import pandas as pd
+
+MISSING = object()
+
+KEY_HASH = "HASH"
 
 
 def hash_dataframe(df: pd.DataFrame) -> str:
     """Return a data hash of the Index/Series/DataFrame."""
-    return hashlib.sha256(pd.util.hash_pandas_object(df, index=True).values).hexdigest()
+    if KEY_HASH in df.attrs:
+        stored_hash = df.attrs[KEY_HASH]
+        df.attrs[KEY_HASH] = "0"
+    new_hash = hashlib.sha256(
+        pd.util.hash_pandas_object(df, index=True).values
+    ).hexdigest()
+    if KEY_HASH in df.attrs:
+        df.attrs[KEY_HASH] = stored_hash
+    return new_hash
 
 
 def _check_valid_extensions(filename: str | pathlib.Path | pd.ExcelFile):
@@ -40,6 +52,7 @@ def load(
     sheet_name: str = "Sheet1",
     *,
     use_hash: bool = True,
+    converters: dict[str, Callable[[str, Any], Any]] | None = None,
 ) -> pd.DataFrame:
     """Load a dataframe from a file, including metadata.
 
@@ -66,16 +79,15 @@ def load(
     if not isinstance(filename, pd.ExcelFile):
         _check_valid_extensions(filename)
 
-    df = pd.read_excel(filename, sheet_name=sheet_name)
+    df = pd.read_excel(filename, sheet_name=sheet_name, converters=converters)
     metadata = pd.read_excel(filename, sheet_name="_attrs_" + sheet_name)
 
     stored_hash = None
 
     for _, row in metadata.iterrows():
-        if row.key == "HASH":
+        df.attrs[row.key] = row.value
+        if row.key == KEY_HASH:
             stored_hash = row.value
-        else:
-            df.attrs[row.key] = row.value
 
     if use_hash:
         if stored_hash is None:
@@ -91,7 +103,10 @@ def load(
 
 
 def load_many(
-    filename: str | pathlib.Path, *, use_hash: bool = True
+    filename: str | pathlib.Path,
+    *,
+    use_hash: bool = True,
+    converters: dict[str, dict[str, Callable[[str, Any], Any]]] | None = None,
 ) -> dict[str, pd.DataFrame]:
     """Load all sheet within a file into dictionary.
 
@@ -113,7 +128,12 @@ def load_many(
 
     with pd.ExcelFile(filename) as xls:
         return {
-            sheet_name: load(xls, sheet_name, use_hash=use_hash)
+            sheet_name: load(
+                xls,
+                sheet_name,
+                use_hash=use_hash,
+                converters=converters.get(sheet_name, None),
+            )
             for sheet_name in xls.sheet_names
             if not sheet_name.startswith("_attrs_")
         }
@@ -150,7 +170,8 @@ def save(
     metadata = [dict(key=k, value=v) for k, v in df.attrs.items()]
 
     if use_hash:
-        metadata.append(dict(key="HASH", value=hash_dataframe(df)))
+        df.attrs[KEY_HASH] = "0"
+        metadata.append(dict(key=KEY_HASH, value=hash_dataframe(df)))
     metadata = pd.DataFrame(metadata)
 
     if isinstance(filename, pd.ExcelWriter):
@@ -191,6 +212,13 @@ def save_many(
 
     _check_valid_extensions(filename)
 
-    with pd.ExcelWriter(filename, mode=mode, if_sheet_exists=if_sheet_exists) as writer:
-        for sheet_name, df in dfs.items():
-            save(df, writer, sheet_name, use_hash=use_hash)
+    if mode == "a":
+        with pd.ExcelWriter(
+            filename, mode=mode, if_sheet_exists=if_sheet_exists
+        ) as writer:
+            for sheet_name, df in dfs.items():
+                save(df, writer, sheet_name, use_hash=use_hash)
+    elif mode == "w":
+        with pd.ExcelWriter(filename, mode=mode) as writer:
+            for sheet_name, df in dfs.items():
+                save(df, writer, sheet_name, use_hash=use_hash)

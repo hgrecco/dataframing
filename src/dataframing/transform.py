@@ -85,7 +85,16 @@ def wrap(func: Callable[[S, T], None]) -> Transformer[S, T]:
     def _inner(source: S) -> T:
         token = var_intersect_keys.set(intersect_keys)
         target = {}  # type: ignore
-        func(source, target)
+
+        try:
+            func(source, target)
+        except Exception as ex:
+            if "exception" in target_typed_dict:
+                target["exception"] = str(ex)
+            else:
+                ex.add_note(repr(source))
+                raise ex
+
         var_intersect_keys.reset(token)
         return target
 
