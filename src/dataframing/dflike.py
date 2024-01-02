@@ -25,7 +25,7 @@ class DataFrameLike(Protocol[T]):
     def iloc(self) -> Accesor[T]:
         ...
 
-    def query(self, expr: str, *, inplace: bool, **kwargs: Any) -> Self:
+    def query(self, expr: str, *, inplace: bool = True, **kwargs: Any) -> Self:
         ...
 
     def iterrows(self) -> Generator[tuple[Any, T], None, None]:
