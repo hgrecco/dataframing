@@ -32,6 +32,8 @@ except ImportError:
         )
 
 
+from .dflike import DataFrameLike
+
 S = TypeVar("S", bound=TypedDict)
 T = TypeVar("T", bound=TypedDict)
 
@@ -52,7 +54,9 @@ class Transformer(Generic[S, T]):
         ...
 
     @staticmethod
-    def map(records: pd.DataFrame, *, max_workers: int | None = 1) -> pd.DataFrame:
+    def map(
+        records: DataFrameLike[S], *, max_workers: int | None = 1
+    ) -> DataFrameLike[T]:
         ...
 
 
