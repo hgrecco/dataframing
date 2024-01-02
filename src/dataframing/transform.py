@@ -41,6 +41,8 @@ var_intersect_keys = ContextVar("var")
 def copy(source: S, target: T) -> None:
     intersect_keys = var_intersect_keys.get()
     for name in intersect_keys:
+        if name == "exception":
+            continue
         target[name] = _copy.deepcopy(source[name])
 
 
@@ -80,7 +82,9 @@ def wrap(func: Callable[[S, T], None]) -> Transformer[S, T]:
 
     source_typed_dict = get_type_hints(source_type)
     target_typed_dict = get_type_hints(target_type)
-    intersect_keys = set(source_typed_dict).intersection(set(target_typed_dict))
+    intersect_keys = set(source_typed_dict.keys()).intersection(
+        set(target_typed_dict.keys())
+    )
 
     def _inner(source: S) -> T:
         token = var_intersect_keys.set(intersect_keys)
