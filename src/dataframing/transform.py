@@ -34,6 +34,14 @@ except ImportError:
 
 from .dflike import DataFrameLike
 
+
+class BuildingTracker(TypedDict):
+    source: str
+    source_hash: str
+    source_datetime: str
+    target: str
+
+
 S = TypeVar("S", bound=TypedDict)
 T = TypeVar("T", bound=TypedDict)
 
